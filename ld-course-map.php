@@ -320,13 +320,16 @@ function ld_course_map_handle_export() {
         $column_labels[] = (string) $labels['categories'];
     }
 
-    $filename = 'ld-course-map-' . $primary . '-' . gmdate('Y-m-d');
+    $filename_primary = sanitize_key($primary);
+    $filename = sanitize_file_name('ld-course-map-' . $filename_primary . '-' . gmdate('Y-m-d'));
+    $xls_filename = $filename . '.xls';
+    $csv_filename = $filename . '.csv';
 
     nocache_headers();
 
     if ('xls' === $format) {
         header('Content-Type: application/vnd.ms-excel; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '.xls"');
+        header('Content-Disposition: attachment; filename="' . $xls_filename . '"; filename*=UTF-8\'\'' . rawurlencode($xls_filename));
 
         echo '<table border="1"><thead><tr>';
         foreach ($column_labels as $column_label) {
@@ -348,11 +351,11 @@ function ld_course_map_handle_export() {
     }
 
     header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="' . $filename . '.csv"');
+    header('Content-Disposition: attachment; filename="' . $csv_filename . '"; filename*=UTF-8\'\'' . rawurlencode($csv_filename));
 
     $output = fopen('php://output', 'w');
     if (false === $output) {
-        wp_die(esc_html__('Unable to create export file.', 'ld-course-map'));
+        exit;
     }
 
     fputcsv($output, $column_labels);
