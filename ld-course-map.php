@@ -219,7 +219,7 @@ function ld_course_report_get_table_data() {
         $course_rows[] = [
             'primary' => $course->post_title,
             'related' => !empty($lesson_titles) ? implode(', ', $lesson_titles) : '—',
-            'categories' => ld_course_report_get_categories_text($course_id, 'ld_course_category'),
+            'categories' => ld_course_map_get_categories_text($course_id, 'ld_course_category'),
         ];
     }
 
@@ -250,7 +250,7 @@ function ld_course_report_get_table_data() {
         $lesson_rows[] = [
             'primary' => $lesson->post_title,
             'related' => implode(', ', $course_titles),
-            'categories' => ld_course_report_get_categories_text($lesson_id, 'ld_lesson_category'),
+            'categories' => ld_course_map_get_categories_text($lesson_id, 'ld_lesson_category'),
         ];
     }
 
@@ -278,7 +278,7 @@ function ld_course_report_get_table_data() {
     ];
 }
 
-function ld_course_report_get_categories_text($post_id, $primary_taxonomy) {
+function ld_course_map_get_categories_text($post_id, $primary_taxonomy) {
     $terms = get_the_terms($post_id, $primary_taxonomy);
 
     if (empty($terms) || is_wp_error($terms)) {
