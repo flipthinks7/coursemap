@@ -10,6 +10,7 @@ if (!defined('ABSPATH')) {
 }
 
 add_shortcode('ld_course_map', 'ld_course_map_shortcode');
+add_action('admin_post_ld_course_map_export', 'ld_course_map_handle_export');
 
 function ld_course_map_shortcode($atts) {
     $atts = shortcode_atts(
@@ -26,6 +27,7 @@ function ld_course_map_shortcode($atts) {
     }
 
     $table_data = ld_course_report_get_table_data();
+    $can_export = current_user_can('manage_options');
     $container_id = 'ld-course-map-' . wp_unique_id();
 
     ob_start();
@@ -116,6 +118,25 @@ function ld_course_map_shortcode($atts) {
                     <span class="ld-slider"></span>
                 </span>
             </label>
+
+            <?php if ($can_export) : ?>
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="ld-course-map-export-form" style="display: flex; align-items: center; gap: 0.5em; margin-left: auto;">
+                    <input type="hidden" name="action" value="ld_course_map_export">
+                    <?php wp_nonce_field('ld_course_map_export', 'ld_course_map_export_nonce'); ?>
+                    <input type="hidden" name="primary" class="ld-course-map-export-primary" value="<?php echo esc_attr($primary); ?>">
+                    <input type="hidden" name="show_related" class="ld-course-map-export-show-related" value="1">
+                    <input type="hidden" name="show_categories" class="ld-course-map-export-show-categories" value="1">
+                    <input type="hidden" name="show_lessons" class="ld-course-map-export-show-lessons" value="1">
+                    <label>
+                        <span class="screen-reader-text"><?php esc_html_e('Export format', 'ld-course-map'); ?></span>
+                        <select name="format" class="ld-course-map-export-format">
+                            <option value="csv"><?php esc_html_e('CSV', 'ld-course-map'); ?></option>
+                            <option value="xls"><?php esc_html_e('Excel', 'ld-course-map'); ?></option>
+                        </select>
+                    </label>
+                    <button type="submit" class="button"><?php esc_html_e('Export', 'ld-course-map'); ?></button>
+                </form>
+            <?php endif; ?>
         </div>
 
         <table class="widefat fixed striped">
@@ -142,6 +163,27 @@ function ld_course_map_shortcode($atts) {
         var categoriesToggle = container.querySelector('.ld-course-map-categories-toggle');
         var headerRow = container.querySelector('.ld-course-map-header-row');
         var body = container.querySelector('.ld-course-map-body');
+        var exportForm = container.querySelector('.ld-course-map-export-form');
+        var exportPrimaryInput = container.querySelector('.ld-course-map-export-primary');
+        var exportShowRelatedInput = container.querySelector('.ld-course-map-export-show-related');
+        var exportShowCategoriesInput = container.querySelector('.ld-course-map-export-show-categories');
+        var exportShowLessonsInput = container.querySelector('.ld-course-map-export-show-lessons');
+
+        function syncExportState() {
+            if (!exportForm) return;
+
+            var primary = primarySelect.value;
+            if (primary !== 'lessons' && primary !== 'categories') {
+                primary = 'courses';
+            }
+
+            var isCategoriesPrimary = primary === 'categories';
+
+            exportPrimaryInput.value = primary;
+            exportShowRelatedInput.value = showRelatedCheckbox.checked ? '1' : '0';
+            exportShowCategoriesInput.value = (!isCategoriesPrimary && showCategoriesCheckbox.checked) ? '1' : '0';
+            exportShowLessonsInput.value = (isCategoriesPrimary && showLessonsCheckbox.checked) ? '1' : '0';
+        }
 
         function render() {
             var primary = primarySelect.value;
@@ -213,12 +255,17 @@ function ld_course_map_shortcode($atts) {
 
                 body.appendChild(tr);
             });
+
+            syncExportState();
         }
 
         primarySelect.addEventListener('change', render);
         showRelatedCheckbox.addEventListener('change', render);
         showCategoriesCheckbox.addEventListener('change', render);
         showLessonsCheckbox.addEventListener('change', render);
+        if (exportForm) {
+            exportForm.addEventListener('submit', syncExportState);
+        }
 
         render();
     })();
@@ -226,6 +273,103 @@ function ld_course_map_shortcode($atts) {
     <?php
 
     return ob_get_clean();
+}
+
+function ld_course_map_handle_export() {
+    if (!current_user_can('manage_options')) {
+        wp_die(esc_html__('You are not allowed to export this report.', 'ld-course-map'));
+    }
+
+    if (!isset($_POST['ld_course_map_export_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['ld_course_map_export_nonce'])), 'ld_course_map_export')) {
+        wp_die(esc_html__('Invalid export request.', 'ld-course-map'));
+    }
+
+    $format = isset($_POST['format']) ? sanitize_key(wp_unslash($_POST['format'])) : 'csv';
+    if (!in_array($format, ['csv', 'xls'], true)) {
+        $format = 'csv';
+    }
+
+    $primary = isset($_POST['primary']) ? sanitize_key(wp_unslash($_POST['primary'])) : 'courses';
+    if (!in_array($primary, ['courses', 'lessons', 'categories'], true)) {
+        $primary = 'courses';
+    }
+
+    $show_related = isset($_POST['show_related']) && '1' === sanitize_text_field(wp_unslash($_POST['show_related']));
+    $show_categories = isset($_POST['show_categories']) && '1' === sanitize_text_field(wp_unslash($_POST['show_categories']));
+    $show_lessons = isset($_POST['show_lessons']) && '1' === sanitize_text_field(wp_unslash($_POST['show_lessons']));
+
+    $table_data = ld_course_report_get_table_data();
+    $labels = isset($table_data['labels'][$primary]) && is_array($table_data['labels'][$primary]) ? $table_data['labels'][$primary] : [];
+    $rows = isset($table_data['rows'][$primary]) && is_array($table_data['rows'][$primary]) ? $table_data['rows'][$primary] : [];
+
+    $column_keys = ['primary'];
+    $column_labels = [isset($labels['primary']) ? (string) $labels['primary'] : 'Primary'];
+
+    if ($show_related && isset($labels['related'])) {
+        $column_keys[] = 'related';
+        $column_labels[] = (string) $labels['related'];
+    }
+
+    if ('categories' === $primary) {
+        if ($show_lessons && isset($labels['lessons'])) {
+            $column_keys[] = 'lessons';
+            $column_labels[] = (string) $labels['lessons'];
+        }
+    } elseif ($show_categories && isset($labels['categories'])) {
+        $column_keys[] = 'categories';
+        $column_labels[] = (string) $labels['categories'];
+    }
+
+    $filename_primary = sanitize_key($primary);
+    $filename = sanitize_file_name('ld-course-map-' . $filename_primary . '-' . gmdate('Y-m-d'));
+    $xls_filename = $filename . '.xls';
+    $csv_filename = $filename . '.csv';
+
+    nocache_headers();
+
+    if ('xls' === $format) {
+        header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+        header('Content-Disposition: attachment; filename*=UTF-8\'\'' . rawurlencode($xls_filename));
+
+        echo '<table border="1"><thead><tr>';
+        foreach ($column_labels as $column_label) {
+            echo '<th>' . esc_html($column_label) . '</th>';
+        }
+        echo '</tr></thead><tbody>';
+
+        foreach ($rows as $row) {
+            echo '<tr>';
+            foreach ($column_keys as $column_key) {
+                $value = isset($row[$column_key]) ? (string) $row[$column_key] : '';
+                echo '<td>' . esc_html($value) . '</td>';
+            }
+            echo '</tr>';
+        }
+
+        echo '</tbody></table>';
+        exit;
+    }
+
+    $output = fopen('php://output', 'w');
+    if (false === $output) {
+        wp_die(esc_html__('Unable to create export file.', 'ld-course-map'));
+    }
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename*=UTF-8\'\'' . rawurlencode($csv_filename));
+
+    fputcsv($output, $column_labels);
+
+    foreach ($rows as $row) {
+        $csv_row = [];
+        foreach ($column_keys as $column_key) {
+            $csv_row[] = isset($row[$column_key]) ? (string) $row[$column_key] : '';
+        }
+        fputcsv($output, $csv_row);
+    }
+
+    fclose($output);
+    exit;
 }
 
 function ld_course_report_get_table_data() {
