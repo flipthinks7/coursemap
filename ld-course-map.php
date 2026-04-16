@@ -170,6 +170,7 @@ function ld_course_report_get_course_sections($course_id) {
     if (!empty($sections_raw)) {
         $decoded_sections = json_decode($sections_raw, true);
         if (is_array($decoded_sections)) {
+            $processed_sections = [];
             foreach ($decoded_sections as $section) {
                 if (!is_array($section)) {
                     continue;
@@ -182,11 +183,13 @@ function ld_course_report_get_course_sections($course_id) {
                     $section_title = trim((string) $section['title']);
                 }
 
-                $sections[] = [
+                $processed_sections[] = [
                     'order' => isset($section['order']) ? (int) $section['order'] : 0,
                     'post_title' => $section_title,
                 ];
             }
+
+            $sections = $processed_sections;
 
             usort($sections, function ($a, $b) {
                 $order_a = isset($a['order']) ? (int) $a['order'] : 0;
