@@ -212,8 +212,7 @@ function ld_course_report_build_lesson_section_map($course_id, $lessons, $sectio
             continue;
         }
 
-        $position = $lesson_index;
-        while (isset($sections[$section_index]) && isset($sections[$section_index]['order']) && (int) $sections[$section_index]['order'] <= $position) {
+        while (isset($sections[$section_index]) && isset($sections[$section_index]['order']) && (int) $sections[$section_index]['order'] <= $lesson_index) {
             $section_title = isset($sections[$section_index]['post_title']) ? trim((string) $sections[$section_index]['post_title']) : '';
             $current_section = '' !== $section_title ? $section_title : ld_course_report_no_section_label();
             $section_index++;
