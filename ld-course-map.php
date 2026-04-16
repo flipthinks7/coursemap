@@ -329,7 +329,7 @@ function ld_course_map_handle_export() {
 
     if ('xls' === $format) {
         header('Content-Type: application/vnd.ms-excel; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $xls_filename . '"; filename*=UTF-8\'\'' . rawurlencode($xls_filename));
+        header('Content-Disposition: attachment; filename*=UTF-8\'\'' . rawurlencode($xls_filename));
 
         echo '<table border="1"><thead><tr>';
         foreach ($column_labels as $column_label) {
@@ -350,13 +350,13 @@ function ld_course_map_handle_export() {
         exit;
     }
 
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="' . $csv_filename . '"; filename*=UTF-8\'\'' . rawurlencode($csv_filename));
-
     $output = fopen('php://output', 'w');
     if (false === $output) {
-        exit;
+        wp_die(esc_html__('Unable to create export file.', 'ld-course-map'));
     }
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename*=UTF-8\'\'' . rawurlencode($csv_filename));
 
     fputcsv($output, $column_labels);
 
