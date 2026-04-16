@@ -99,6 +99,14 @@ function ld_course_map_shortcode($atts) {
                     <span class="ld-slider"></span>
                 </span>
             </label>
+
+            <label class="ld-toggle-label">
+                <span><?php esc_html_e('Show Categories', 'ld-course-map'); ?></span>
+                <span class="ld-toggle">
+                    <input type="checkbox" class="ld-course-map-show-categories" checked>
+                    <span class="ld-slider"></span>
+                </span>
+            </label>
         </div>
 
         <table class="widefat fixed striped">
@@ -117,6 +125,7 @@ function ld_course_map_shortcode($atts) {
         var data = <?php echo wp_json_encode($table_data); ?>;
         var primarySelect = container.querySelector('.ld-course-map-primary');
         var showRelatedCheckbox = container.querySelector('.ld-course-map-show-related');
+        var showCategoriesCheckbox = container.querySelector('.ld-course-map-show-categories');
         var relatedLabel = container.querySelector('.ld-course-map-related-label');
         var headerRow = container.querySelector('.ld-course-map-header-row');
         var body = container.querySelector('.ld-course-map-body');
@@ -126,6 +135,7 @@ function ld_course_map_shortcode($atts) {
             var labels = data.labels[primary];
             var rows = data.rows[primary] || [];
             var showRelated = !!showRelatedCheckbox.checked;
+            var showCategories = !!showCategoriesCheckbox.checked;
 
             relatedLabel.textContent = data.toggle_labels[primary];
 
@@ -142,6 +152,12 @@ function ld_course_map_shortcode($atts) {
                 headerRow.appendChild(relatedTh);
             }
 
+            if (showCategories) {
+                var categoriesTh = document.createElement('th');
+                categoriesTh.textContent = labels.categories;
+                headerRow.appendChild(categoriesTh);
+            }
+
             rows.forEach(function(row) {
                 var tr = document.createElement('tr');
 
@@ -155,12 +171,19 @@ function ld_course_map_shortcode($atts) {
                     tr.appendChild(relatedTd);
                 }
 
+                if (showCategories) {
+                    var categoriesTd = document.createElement('td');
+                    categoriesTd.textContent = row.categories;
+                    tr.appendChild(categoriesTd);
+                }
+
                 body.appendChild(tr);
             });
         }
 
         primarySelect.addEventListener('change', render);
         showRelatedCheckbox.addEventListener('change', render);
+        showCategoriesCheckbox.addEventListener('change', render);
 
         render();
     })();
@@ -196,6 +219,7 @@ function ld_course_report_get_table_data() {
         $course_rows[] = [
             'primary' => $course->post_title,
             'related' => !empty($lesson_titles) ? implode(', ', $lesson_titles) : '—',
+            'categories' => ld_course_report_get_categories_text($course_id, 'ld_course_category'),
         ];
     }
 
@@ -226,6 +250,7 @@ function ld_course_report_get_table_data() {
         $lesson_rows[] = [
             'primary' => $lesson->post_title,
             'related' => implode(', ', $course_titles),
+            'categories' => ld_course_report_get_categories_text($lesson_id, 'ld_lesson_category'),
         ];
     }
 
@@ -234,10 +259,12 @@ function ld_course_report_get_table_data() {
             'courses' => [
                 'primary' => 'Course',
                 'related' => 'Lessons',
+                'categories' => 'Categories',
             ],
             'lessons' => [
                 'primary' => 'Lesson',
                 'related' => 'Courses',
+                'categories' => 'Categories',
             ],
         ],
         'toggle_labels' => [
@@ -249,4 +276,20 @@ function ld_course_report_get_table_data() {
             'lessons' => $lesson_rows,
         ],
     ];
+}
+
+function ld_course_report_get_categories_text($post_id, $primary_taxonomy) {
+    $terms = get_the_terms($post_id, $primary_taxonomy);
+
+    if (empty($terms) || is_wp_error($terms)) {
+        $terms = get_the_terms($post_id, 'category');
+    }
+
+    if (empty($terms) || is_wp_error($terms)) {
+        return '—';
+    }
+
+    $category_names = array_values(array_unique(array_filter(wp_list_pluck($terms, 'name'))));
+
+    return !empty($category_names) ? implode(', ', $category_names) : '—';
 }
