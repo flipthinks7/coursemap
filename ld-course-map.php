@@ -171,7 +171,7 @@ function ld_course_report_get_course_sections($course_id) {
         $decoded_sections = json_decode($sections_raw, true);
         if (is_array($decoded_sections)) {
             $processed_sections = [];
-            foreach ($decoded_sections as $section) {
+            foreach ($decoded_sections as $section_index => $section) {
                 if (!is_array($section)) {
                     continue;
                 }
@@ -184,7 +184,7 @@ function ld_course_report_get_course_sections($course_id) {
                 }
 
                 $processed_sections[] = [
-                    'order' => isset($section['order']) ? (int) $section['order'] : 0,
+                    'order' => isset($section['order']) ? (int) $section['order'] : (int) $section_index,
                     'post_title' => $section_title,
                 ];
             }
@@ -229,11 +229,15 @@ function ld_course_report_build_lesson_section_map($course_id, $lessons, $sectio
 }
 
 function ld_course_report_get_lesson_section_for_course($course_id, $lesson_id) {
-    $course_lessons = learndash_get_lesson_list($course_id);
-    $sections = ld_course_report_get_course_sections($course_id);
-    $sections_by_lesson = ld_course_report_build_lesson_section_map($course_id, $course_lessons, $sections);
+    static $course_section_map_cache = [];
 
-    return isset($sections_by_lesson[$lesson_id]) ? $sections_by_lesson[$lesson_id] : ld_course_report_no_section_label();
+    if (!isset($course_section_map_cache[$course_id])) {
+        $course_lessons = learndash_get_lesson_list($course_id);
+        $sections = ld_course_report_get_course_sections($course_id);
+        $course_section_map_cache[$course_id] = ld_course_report_build_lesson_section_map($course_id, $course_lessons, $sections);
+    }
+
+    return isset($course_section_map_cache[$course_id][$lesson_id]) ? $course_section_map_cache[$course_id][$lesson_id] : ld_course_report_no_section_label();
 }
 
 function ld_course_report_get_table_data() {
