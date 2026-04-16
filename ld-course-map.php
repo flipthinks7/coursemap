@@ -2,7 +2,7 @@
 /*
 Plugin Name: LearnDash Course Map
 Description: Displays courses with lessons in a structured table.
-Version: 1.2
+Version: 1.3
 */
 
 if (!defined('ABSPATH')) {
