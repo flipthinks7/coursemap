@@ -21,7 +21,7 @@ function ld_course_map_shortcode($atts) {
     );
 
     $primary = sanitize_key($atts['primary']);
-    if (!in_array($primary, ['courses', 'lessons'], true)) {
+    if (!in_array($primary, ['courses', 'lessons', 'categories'], true)) {
         $primary = 'courses';
     }
 
@@ -89,10 +89,11 @@ function ld_course_map_shortcode($atts) {
                 <select class="ld-course-map-primary" style="margin-left: 0.5em;">
                     <option value="courses" <?php selected('courses', $primary); ?>>Courses</option>
                     <option value="lessons" <?php selected('lessons', $primary); ?>>Lessons</option>
+                    <option value="categories" <?php selected('categories', $primary); ?>>Categories</option>
                 </select>
             </label>
 
-            <label class="ld-toggle-label">
+            <label class="ld-toggle-label ld-course-map-related-toggle">
                 <span class="ld-course-map-related-label"></span>
                 <span class="ld-toggle">
                     <input type="checkbox" class="ld-course-map-show-related" checked>
@@ -100,7 +101,15 @@ function ld_course_map_shortcode($atts) {
                 </span>
             </label>
 
-            <label class="ld-toggle-label">
+            <label class="ld-toggle-label ld-course-map-lessons-toggle" style="display: none;">
+                <span class="ld-course-map-lessons-label"><?php esc_html_e('Show Lessons', 'ld-course-map'); ?></span>
+                <span class="ld-toggle">
+                    <input type="checkbox" class="ld-course-map-show-lessons" checked>
+                    <span class="ld-slider"></span>
+                </span>
+            </label>
+
+            <label class="ld-toggle-label ld-course-map-categories-toggle">
                 <span><?php esc_html_e('Show Categories', 'ld-course-map'); ?></span>
                 <span class="ld-toggle">
                     <input type="checkbox" class="ld-course-map-show-categories" checked>
@@ -126,18 +135,31 @@ function ld_course_map_shortcode($atts) {
         var primarySelect = container.querySelector('.ld-course-map-primary');
         var showRelatedCheckbox = container.querySelector('.ld-course-map-show-related');
         var showCategoriesCheckbox = container.querySelector('.ld-course-map-show-categories');
+        var showLessonsCheckbox = container.querySelector('.ld-course-map-show-lessons');
         var relatedLabel = container.querySelector('.ld-course-map-related-label');
+        var lessonsLabel = container.querySelector('.ld-course-map-lessons-label');
+        var lessonsToggle = container.querySelector('.ld-course-map-lessons-toggle');
+        var categoriesToggle = container.querySelector('.ld-course-map-categories-toggle');
         var headerRow = container.querySelector('.ld-course-map-header-row');
         var body = container.querySelector('.ld-course-map-body');
 
         function render() {
-            var primary = primarySelect.value === 'lessons' ? 'lessons' : 'courses';
+            var primary = primarySelect.value;
+            if (primary !== 'lessons' && primary !== 'categories') {
+                primary = 'courses';
+            }
+
+            var isCategoriesPrimary = primary === 'categories';
             var labels = data.labels[primary];
             var rows = data.rows[primary] || [];
             var showRelated = !!showRelatedCheckbox.checked;
-            var showCategories = !!showCategoriesCheckbox.checked;
+            var showCategories = !isCategoriesPrimary && !!showCategoriesCheckbox.checked;
+            var showLessons = isCategoriesPrimary && !!showLessonsCheckbox.checked;
 
-            relatedLabel.textContent = data.toggle_labels[primary];
+            relatedLabel.textContent = data.toggle_labels[primary].related;
+            lessonsLabel.textContent = data.toggle_labels[primary].lessons || 'Show Lessons';
+            lessonsToggle.style.display = isCategoriesPrimary ? 'flex' : 'none';
+            categoriesToggle.style.display = isCategoriesPrimary ? 'none' : 'flex';
 
             headerRow.innerHTML = '';
             body.innerHTML = '';
@@ -152,7 +174,13 @@ function ld_course_map_shortcode($atts) {
                 headerRow.appendChild(relatedTh);
             }
 
-            if (showCategories) {
+            if (isCategoriesPrimary) {
+                if (showLessons) {
+                    var lessonsTh = document.createElement('th');
+                    lessonsTh.textContent = labels.lessons;
+                    headerRow.appendChild(lessonsTh);
+                }
+            } else if (showCategories) {
                 var categoriesTh = document.createElement('th');
                 categoriesTh.textContent = labels.categories;
                 headerRow.appendChild(categoriesTh);
@@ -171,7 +199,13 @@ function ld_course_map_shortcode($atts) {
                     tr.appendChild(relatedTd);
                 }
 
-                if (showCategories) {
+                if (isCategoriesPrimary) {
+                    if (showLessons) {
+                        var lessonsTd = document.createElement('td');
+                        lessonsTd.textContent = row.lessons;
+                        tr.appendChild(lessonsTd);
+                    }
+                } else if (showCategories) {
                     var categoriesTd = document.createElement('td');
                     categoriesTd.textContent = row.categories;
                     tr.appendChild(categoriesTd);
@@ -184,6 +218,7 @@ function ld_course_map_shortcode($atts) {
         primarySelect.addEventListener('change', render);
         showRelatedCheckbox.addEventListener('change', render);
         showCategoriesCheckbox.addEventListener('change', render);
+        showLessonsCheckbox.addEventListener('change', render);
 
         render();
     })();
@@ -254,6 +289,73 @@ function ld_course_report_get_table_data() {
         ];
     }
 
+    $category_terms = get_terms([
+        'taxonomy' => 'ld_course_category',
+        'hide_empty' => false,
+    ]);
+
+    if (empty($category_terms) || is_wp_error($category_terms)) {
+        $category_terms = get_terms([
+            'taxonomy' => 'category',
+            'hide_empty' => false,
+        ]);
+    }
+
+    if (is_wp_error($category_terms) || empty($category_terms)) {
+        $category_terms = [];
+    }
+
+    $category_rows = [];
+
+    foreach ($category_terms as $category_term) {
+        $course_taxonomy = $category_term->taxonomy === 'category' ? 'category' : 'ld_course_category';
+        $courses_in_category = get_posts([
+            'post_type' => 'sfwd-courses',
+            'numberposts' => -1,
+            'tax_query' => [
+                [
+                    'taxonomy' => $course_taxonomy,
+                    'field' => 'term_id',
+                    'terms' => (int) $category_term->term_id,
+                ],
+            ],
+        ]);
+
+        $course_titles = array_values(array_unique(array_filter(wp_list_pluck($courses_in_category, 'post_title'))));
+        if (empty($course_titles)) {
+            $course_titles = ['—'];
+        }
+
+        $lessons_in_category = get_posts([
+            'post_type' => 'sfwd-lessons',
+            'numberposts' => -1,
+            'tax_query' => [
+                'relation' => 'OR',
+                [
+                    'taxonomy' => 'ld_lesson_category',
+                    'field' => 'slug',
+                    'terms' => (string) $category_term->slug,
+                ],
+                [
+                    'taxonomy' => 'category',
+                    'field' => 'slug',
+                    'terms' => (string) $category_term->slug,
+                ],
+            ],
+        ]);
+
+        $lesson_titles = array_values(array_unique(array_filter(wp_list_pluck($lessons_in_category, 'post_title'))));
+        if (empty($lesson_titles)) {
+            $lesson_titles = ['—'];
+        }
+
+        $category_rows[] = [
+            'primary' => $category_term->name,
+            'related' => implode(', ', $course_titles),
+            'lessons' => implode(', ', $lesson_titles),
+        ];
+    }
+
     return [
         'labels' => [
             'courses' => [
@@ -266,14 +368,28 @@ function ld_course_report_get_table_data() {
                 'related' => 'Courses',
                 'categories' => 'Categories',
             ],
+            'categories' => [
+                'primary' => 'Category',
+                'related' => 'Courses',
+                'lessons' => 'Lessons',
+            ],
         ],
         'toggle_labels' => [
-            'courses' => 'Show Lessons',
-            'lessons' => 'Show Courses',
+            'courses' => [
+                'related' => 'Show Lessons',
+            ],
+            'lessons' => [
+                'related' => 'Show Courses',
+            ],
+            'categories' => [
+                'related' => 'Show Courses',
+                'lessons' => 'Show Lessons',
+            ],
         ],
         'rows' => [
             'courses' => $course_rows,
             'lessons' => $lesson_rows,
+            'categories' => $category_rows,
         ],
     ];
 }
