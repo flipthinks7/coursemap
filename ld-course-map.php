@@ -47,7 +47,7 @@ function ld_course_map_shortcode($atts) {
 
             <label>
                 <input type="checkbox" class="ld-course-map-show-related" checked>
-                <span class="ld-course-map-related-label"><?php esc_html_e('Show Lessons', 'ld-course-map'); ?></span>
+                <span class="ld-course-map-related-label"><?php echo esc_html($table_data['toggle_labels']['courses']); ?></span>
             </label>
         </div>
 
@@ -81,7 +81,7 @@ function ld_course_map_shortcode($atts) {
             var showSections = !!showSectionsCheckbox.checked;
             var showRelated = !!showRelatedCheckbox.checked;
 
-            relatedLabel.textContent = primary === 'courses' ? 'Show Lessons' : 'Show Courses';
+            relatedLabel.textContent = data.toggle_labels[primary];
 
             headerRow.innerHTML = '';
             body.innerHTML = '';
@@ -283,15 +283,19 @@ function ld_course_report_get_table_data() {
     return [
         'labels' => [
             'courses' => [
-                'primary' => 'Course',
-                'sections' => 'Sections',
-                'related' => 'Lessons',
+                'primary' => __('Course', 'ld-course-map'),
+                'sections' => __('Sections', 'ld-course-map'),
+                'related' => __('Lessons', 'ld-course-map'),
             ],
             'lessons' => [
-                'primary' => 'Lesson',
-                'sections' => 'Sections',
-                'related' => 'Courses',
+                'primary' => __('Lesson', 'ld-course-map'),
+                'sections' => __('Sections', 'ld-course-map'),
+                'related' => __('Courses', 'ld-course-map'),
             ],
+        ],
+        'toggle_labels' => [
+            'courses' => __('Show Lessons', 'ld-course-map'),
+            'lessons' => __('Show Courses', 'ld-course-map'),
         ],
         'rows' => [
             'courses' => $course_rows,
