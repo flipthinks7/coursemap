@@ -202,6 +202,7 @@ function ld_course_report_get_course_sections($course_id) {
 
 function ld_course_report_build_lesson_section_map($course_id, $lessons, $sections) {
     $section_index = 0;
+    $lesson_index = 0;
     $current_section = ld_course_report_no_section_label();
     $lesson_sections = [];
 
@@ -211,7 +212,7 @@ function ld_course_report_build_lesson_section_map($course_id, $lessons, $sectio
             continue;
         }
 
-        $position = (int) $lesson_position;
+        $position = $lesson_index;
         while (isset($sections[$section_index]) && isset($sections[$section_index]['order']) && (int) $sections[$section_index]['order'] <= $position) {
             $section_title = isset($sections[$section_index]['post_title']) ? trim((string) $sections[$section_index]['post_title']) : '';
             $current_section = '' !== $section_title ? $section_title : ld_course_report_no_section_label();
@@ -219,6 +220,7 @@ function ld_course_report_build_lesson_section_map($course_id, $lessons, $sectio
         }
 
         $lesson_sections[$lesson_id] = $current_section;
+        $lesson_index++;
     }
 
     return $lesson_sections;
@@ -250,10 +252,9 @@ function ld_course_report_get_table_data() {
 
         $lessons_by_section = [];
         foreach ($sections_by_lesson as $lesson_id => $section_title) {
-            $section_label = '' !== trim((string) $section_title) ? $section_title : ld_course_report_no_section_label();
-            $lessons_by_section[$section_label][] = get_the_title($lesson_id);
+            $lessons_by_section[$section_title][] = get_the_title($lesson_id);
             $lesson_course_map[$lesson_id][$course_id] = $course->post_title;
-            $lesson_section_map[$lesson_id][$course_id] = $section_label;
+            $lesson_section_map[$lesson_id][$course_id] = $section_title;
         }
 
         if (empty($lessons_by_section)) {
