@@ -170,7 +170,26 @@ function ld_course_report_get_course_sections($course_id) {
     if (!empty($sections_raw)) {
         $decoded_sections = json_decode($sections_raw, true);
         if (is_array($decoded_sections)) {
-            $sections = $decoded_sections;
+            $processed_sections = [];
+            foreach ($decoded_sections as $section_index => $section) {
+                if (!is_array($section)) {
+                    continue;
+                }
+
+                $section_title = '';
+                if (isset($section['post_title'])) {
+                    $section_title = trim((string) $section['post_title']);
+                } elseif (isset($section['title'])) {
+                    $section_title = trim((string) $section['title']);
+                }
+
+                $processed_sections[] = [
+                    'order' => isset($section['order']) ? (int) $section['order'] : (int) $section_index,
+                    'post_title' => $section_title,
+                ];
+            }
+
+            $sections = $processed_sections;
 
             usort($sections, function ($a, $b) {
                 $order_a = isset($a['order']) ? (int) $a['order'] : 0;
@@ -186,6 +205,7 @@ function ld_course_report_get_course_sections($course_id) {
 
 function ld_course_report_build_lesson_section_map($course_id, $lessons, $sections) {
     $section_index = 0;
+    $lesson_index = 0;
     $current_section = ld_course_report_no_section_label();
     $lesson_sections = [];
 
@@ -195,17 +215,29 @@ function ld_course_report_build_lesson_section_map($course_id, $lessons, $sectio
             continue;
         }
 
-        $position = $lesson_position + 1;
-        while (isset($sections[$section_index]) && isset($sections[$section_index]['order']) && (int) $sections[$section_index]['order'] <= $position) {
-            $section_title = isset($sections[$section_index]['title']) ? trim((string) $sections[$section_index]['title']) : '';
+        while (isset($sections[$section_index]) && isset($sections[$section_index]['order']) && (int) $sections[$section_index]['order'] <= $lesson_index) {
+            $section_title = isset($sections[$section_index]['post_title']) ? trim((string) $sections[$section_index]['post_title']) : '';
             $current_section = '' !== $section_title ? $section_title : ld_course_report_no_section_label();
             $section_index++;
         }
 
         $lesson_sections[$lesson_id] = $current_section;
+        $lesson_index++;
     }
 
     return $lesson_sections;
+}
+
+function ld_course_report_get_lesson_section_for_course($course_id, $lesson_id) {
+    static $course_section_map_cache = [];
+
+    if (!isset($course_section_map_cache[$course_id])) {
+        $course_lessons = learndash_get_lesson_list($course_id);
+        $sections = ld_course_report_get_course_sections($course_id);
+        $course_section_map_cache[$course_id] = ld_course_report_build_lesson_section_map($course_id, $course_lessons, $sections);
+    }
+
+    return isset($course_section_map_cache[$course_id][$lesson_id]) ? $course_section_map_cache[$course_id][$lesson_id] : ld_course_report_no_section_label();
 }
 
 function ld_course_report_get_table_data() {
@@ -224,30 +256,29 @@ function ld_course_report_get_table_data() {
         $sections = ld_course_report_get_course_sections($course_id);
         $sections_by_lesson = ld_course_report_build_lesson_section_map($course_id, $lessons, $sections);
 
-        $lesson_titles = [];
+        $lessons_by_section = [];
         foreach ($sections_by_lesson as $lesson_id => $section_title) {
-            $lesson_titles[] = get_the_title($lesson_id);
+            $lessons_by_section[$section_title][] = get_the_title($lesson_id);
             $lesson_course_map[$lesson_id][$course_id] = $course->post_title;
             $lesson_section_map[$lesson_id][$course_id] = $section_title;
         }
 
-        $section_titles = array_values(array_filter(array_map(function ($section) {
-            return isset($section['title']) ? trim((string) $section['title']) : '';
-        }, $sections)));
-
-        if (empty($section_titles)) {
-            $section_titles = [ld_course_report_no_section_label()];
+        if (empty($lessons_by_section)) {
+            $course_rows[] = [
+                'primary' => $course->post_title,
+                'sections' => ld_course_report_no_section_label(),
+                'related' => '—',
+            ];
+            continue;
         }
 
-        if (empty($lesson_titles)) {
-            $lesson_titles = ['—'];
+        foreach ($lessons_by_section as $section_title => $lesson_titles) {
+            $course_rows[] = [
+                'primary' => $course->post_title,
+                'sections' => $section_title,
+                'related' => implode(', ', $lesson_titles),
+            ];
         }
-
-        $course_rows[] = [
-            'primary' => $course->post_title,
-            'sections' => implode(', ', array_unique($section_titles)),
-            'related' => implode(', ', $lesson_titles),
-        ];
     }
 
     $lessons = get_posts([
@@ -271,7 +302,7 @@ function ld_course_report_get_table_data() {
 
             if ($course_id && 'sfwd-courses' === get_post_type($course_id)) {
                 $lesson_course_map[$lesson_id][$course_id] = get_the_title($course_id);
-                $lesson_section_map[$lesson_id][$course_id] = ld_course_report_no_section_label();
+                $lesson_section_map[$lesson_id][$course_id] = ld_course_report_get_lesson_section_for_course($course_id, $lesson_id);
             }
         }
 
