@@ -66,7 +66,7 @@ function ld_course_map_shortcode($atts) {
             return;
         }
 
-        var data = <?php echo wp_json_encode($table_data); ?>;
+        var data = <?php echo wp_json_encode($table_data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
         var primarySelect = container.querySelector('.ld-course-map-primary');
         var showSectionsCheckbox = container.querySelector('.ld-course-map-show-sections');
         var showRelatedCheckbox = container.querySelector('.ld-course-map-show-related');
@@ -171,15 +171,15 @@ function ld_course_report_get_course_sections($course_id) {
         $decoded_sections = json_decode($sections_raw, true);
         if (is_array($decoded_sections)) {
             $sections = $decoded_sections;
+
+            usort($sections, function ($a, $b) {
+                $order_a = isset($a['order']) ? (int) $a['order'] : 0;
+                $order_b = isset($b['order']) ? (int) $b['order'] : 0;
+
+                return $order_a <=> $order_b;
+            });
         }
     }
-
-    usort($sections, function ($a, $b) {
-        $order_a = isset($a['order']) ? (int) $a['order'] : 0;
-        $order_b = isset($b['order']) ? (int) $b['order'] : 0;
-
-        return $order_a <=> $order_b;
-    });
 
     return $sections;
 }
