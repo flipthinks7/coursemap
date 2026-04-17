@@ -131,7 +131,7 @@ function ld_course_map_shortcode($atts) {
                         <span class="screen-reader-text"><?php esc_html_e('Export format', 'ld-course-map'); ?></span>
                         <select name="format" class="ld-course-map-export-format">
                             <option value="csv"><?php esc_html_e('CSV', 'ld-course-map'); ?></option>
-                            <option value="xls"><?php esc_html_e('Excel', 'ld-course-map'); ?></option>
+                            <option value="xlsx"><?php esc_html_e('Excel', 'ld-course-map'); ?></option>
                         </select>
                     </label>
                     <button type="submit" class="button"><?php esc_html_e('Export', 'ld-course-map'); ?></button>
@@ -285,7 +285,7 @@ function ld_course_map_handle_export() {
     }
 
     $format = isset($_POST['format']) ? sanitize_key(wp_unslash($_POST['format'])) : 'csv';
-    if (!in_array($format, ['csv', 'xls'], true)) {
+    if (!in_array($format, ['csv', 'xlsx'], true)) {
         $format = 'csv';
     }
 
@@ -322,13 +322,13 @@ function ld_course_map_handle_export() {
 
     $filename_primary = sanitize_key($primary);
     $filename = sanitize_file_name('ld-course-map-' . $filename_primary . '-' . gmdate('Y-m-d'));
-    $xls_filename = $filename . '.xls';
+    $xls_filename = $filename . '.xlsx';
     $csv_filename = $filename . '.csv';
 
     nocache_headers();
 
-    if ('xls' === $format) {
-        header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+    if ('xlsx' === $format) {
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; charset=utf-8');
         header('Content-Disposition: attachment; filename*=UTF-8\'\'' . rawurlencode($xls_filename));
 
         echo '<table border="1"><thead><tr>';
